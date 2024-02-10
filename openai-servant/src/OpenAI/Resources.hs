@@ -250,29 +250,27 @@ instance A.ToJSON ChatFunctionCall where
 
 data ChatMessage = ChatMessage
   { chmContent :: Maybe T.Text,
-    chmRole :: T.Text,
-    chmFunctionCall :: Maybe ChatFunctionCall,
     chmName :: Maybe T.Text
   }
   deriving (Show, Eq)
 
 instance A.FromJSON ChatMessage where
   parseJSON = A.withObject "ChatMessage" $ \obj ->
-    ChatMessage <$> obj A..:? "content"
-                <*> obj A..: "role"
-                <*> obj A..:? "function_call"
-                <*> obj A..:? "name"
+    ChatMessage
+      <$> obj A..:? "content"
+      <*> obj A..: "role"
+      <*> obj A..:? "name"
 
 instance A.ToJSON ChatMessage where
-  toJSON (ChatMessage {chmContent = content, chmRole = role, chmFunctionCall = functionCall, chmName = name}) =
-    A.object $ 
+  toJSON (ChatMessage {chmContent = content, chmRole = role, chmName = name}) =
+    A.object $
       [ "content" A..= content,
         "role" A..= role
-      ] ++ catMaybes
-      [ ("function_call" A..=) <$> functionCall, 
-        ("name" A..=) <$> name
       ]
-      
+        ++ catMaybes
+          [ ("name" A..=) <$> name
+          ]
+
 data ChatFunction = ChatFunction
   { chfName :: T.Text,
     chfDescription :: T.Text,
@@ -280,17 +278,17 @@ data ChatFunction = ChatFunction
   }
   deriving (Show, Eq)
 
-data ChatFunctionCallStrategy =
-    CFCS_auto
+data ChatFunctionCallStrategy
+  = CFCS_auto
   | CFCS_none
   | CFCS_name T.Text
   deriving (Show, Eq)
 
 instance ToJSON ChatFunctionCallStrategy where
   toJSON = \case
-    CFCS_auto              -> A.String "auto"
-    CFCS_none              -> A.String "none"
-    CFCS_name functionName -> A.object [ "name" A..= A.toJSON functionName ]
+    CFCS_auto -> A.String "auto"
+    CFCS_none -> A.String "none"
+    CFCS_name functionName -> A.object ["name" A..= A.toJSON functionName]
 
 instance FromJSON ChatFunctionCallStrategy where
   parseJSON (A.String "auto") = pure CFCS_auto
@@ -302,8 +300,6 @@ instance FromJSON ChatFunctionCallStrategy where
 data ChatCompletionRequest = ChatCompletionRequest
   { chcrModel :: ModelId,
     chcrMessages :: [ChatMessage],
-    chcrFunctions :: Maybe [ChatFunction],
-    chcrFunctionCall :: Maybe ChatFunctionCallStrategy,
     chcrTemperature :: Maybe Double,
     chcrTopP :: Maybe Double,
     chcrN :: Maybe Int,
@@ -345,8 +341,6 @@ defaultChatCompletionRequest model messages =
   ChatCompletionRequest
     { chcrModel = model,
       chcrMessages = messages,
-      chcrFunctions = Nothing,
-      chcrFunctionCall = Nothing,
       chcrTemperature = Nothing,
       chcrTopP = Nothing,
       chcrN = Nothing,

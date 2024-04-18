@@ -28,14 +28,19 @@ module OpenAI.Client
     completeText,
 
     -- * Chat
+    ChatRole (..),
     ChatFunction (..),
     ChatFunctionCall (..),
     ChatFunctionCallStrategy (..),
     ChatMessage (..),
     ChatCompletionRequest (..),
     ChatChoice (..),
+    ChatFinishReason (..),
     ChatResponse (..),
-    ChatResponseFormat(..),
+    ChatResponseFormat (..),
+    ChatTool (..),
+    ChatToolType (..),
+    ChatToolCall (..),
     defaultChatCompletionRequest,
     completeChat,
 
@@ -107,8 +112,8 @@ module OpenAI.Client
   )
 where
 
-import Control.Monad.IO.Class (MonadIO(..))
 import Common.Client.Internal.Helpers
+import Control.Monad.IO.Class (MonadIO (..))
 import qualified Data.ByteString.Lazy as BSL
 import Data.Proxy
 import qualified Data.Text as T
@@ -184,13 +189,13 @@ EP1 (createImageVariation, ImageVariationRequest, ImageResponse)
 
 EP1 (createEmbedding, EmbeddingCreate, EmbeddingResponse)
 
-createTranscription :: MonadIO m => OpenAIClient -> AudioTranscriptionRequest -> m (Either ClientError AudioResponseData)
+createTranscription :: (MonadIO m) => OpenAIClient -> AudioTranscriptionRequest -> m (Either ClientError AudioResponseData)
 createTranscription sc atr =
   do
     bnd <- liftIO MP.genBoundary
     createTranscriptionInternal sc (bnd, atr)
 
-createAudioTranslation :: MonadIO m => OpenAIClient -> AudioTranslationRequest -> m (Either ClientError AudioResponseData)
+createAudioTranslation :: (MonadIO m) => OpenAIClient -> AudioTranslationRequest -> m (Either ClientError AudioResponseData)
 createAudioTranslation sc atr =
   do
     bnd <- liftIO MP.genBoundary
@@ -199,7 +204,7 @@ createAudioTranslation sc atr =
 EP1 (createTranscriptionInternal, (BSL.ByteString, AudioTranscriptionRequest), AudioResponseData)
 EP1 (createAudioTranslationInternal, (BSL.ByteString, AudioTranslationRequest), AudioResponseData)
 
-createFile :: MonadIO m => OpenAIClient -> FileCreate -> m (Either ClientError File)
+createFile :: (MonadIO m) => OpenAIClient -> FileCreate -> m (Either ClientError File)
 createFile sc rfc =
   do
     bnd <- liftIO MP.genBoundary

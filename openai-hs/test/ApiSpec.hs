@@ -65,10 +65,10 @@ apiTests2023 =
               defaultChatCompletionRequest
                 (ModelId "gpt-3.5-turbo")
                 [ ChatMessage
-                    { chmRole = "user",
+                    { chmRole = CR_user,
                       chmContent = Just "What is the opposite of up? Answer in one word with no punctuation.",
-                      chmFunctionCall = Nothing,
-                      chmName = Nothing
+                      chmName = Nothing,
+                      chmToolCalls = Nothing
                     }
                 ]
         res <- forceSuccess $ completeChat cli completion
@@ -79,16 +79,16 @@ apiTests2023 =
               defaultChatCompletionRequest
                 (ModelId "gpt-3.5-turbo")
                 [ ChatMessage
-                    { chmRole = "assistant",
+                    { chmRole = CR_assistant,
                       chmContent = Nothing,
-                      chmFunctionCall = Just $ ChatFunctionCall { chfcName = "f", chfcArguments = "{}" },
-                      chmName = Nothing
+                      chmName = Nothing,
+                      chmToolCalls = Nothing
                     },
                   ChatMessage
-                    { chmRole = "function",
+                    { chmRole = CR_tool,
                       chmContent = Just "x",
-                      chmFunctionCall = Nothing,
-                      chmName = Just "f"
+                      chmName = Just "f",
+                      chmToolCalls = Nothing
                     }
                 ]
         res <- forceSuccess $ completeChat cli completion

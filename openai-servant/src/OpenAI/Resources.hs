@@ -29,7 +29,7 @@ module OpenAI.Resources
     ChatCompletionRequest (..),
     ChatChoice (..),
     ChatResponse (..),
-    ChatResponseFormat(..),
+    ChatResponseFormat (..),
     defaultChatCompletionRequest,
 
     -- * Images
@@ -83,19 +83,19 @@ module OpenAI.Resources
   )
 where
 
+import Common.Internal.Aeson
 import Control.Applicative ((<|>))
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as BSL
 import Data.Maybe (catMaybes)
+import Data.String (IsString (..))
 import qualified Data.Text as T
-import Data.String (IsString(..))
+import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Data.Vector as V
-import qualified Data.Text.Encoding as T
 import GHC.Exts (IsList)
 import Network.Mime (defaultMimeLookup)
-import OpenAI.Internal.Aeson
 import Servant.API
 import Servant.Multipart.API
 
@@ -322,19 +322,19 @@ data ChatResponseFormat
 
 instance ToJSON ChatResponseFormat where
   toJSON = \case
-    RF_text        -> A.object [ "type" A..= A.String "text" ]
-    RF_json_object -> A.object [ "type" A..= A.String "json_object" ]
+    RF_text -> A.object ["type" A..= A.String "text"]
+    RF_json_object -> A.object ["type" A..= A.String "json_object"]
 
 instance FromJSON ChatResponseFormat where
   parseJSON = A.withObject "ChatResponseFormat" $ \o -> do
     rt <- o A..: "type"
     case rt of
-      "text"
-        -> pure RF_text
-      "json_object"
-        -> pure RF_json_object
-      xs
-        -> fail $ "ChatResponseFormat unexpected type: " <> T.unpack xs
+      "text" ->
+        pure RF_text
+      "json_object" ->
+        pure RF_json_object
+      xs ->
+        fail $ "ChatResponseFormat unexpected type: " <> T.unpack xs
 
 defaultChatCompletionRequest :: ModelId -> [ChatMessage] -> ChatCompletionRequest
 defaultChatCompletionRequest model messages =
@@ -386,14 +386,14 @@ data ImageResponseData
 
 instance ToJSON ImageResponseData where
   toJSON = \case
-    IRD_url d      -> A.object [ "url" A..= A.String d ]
-    IRD_b64_json d -> A.object [ "b64_json" A..= A.String d ]
+    IRD_url d -> A.object ["url" A..= A.String d]
+    IRD_b64_json d -> A.object ["b64_json" A..= A.String d]
 
 instance FromJSON ImageResponseData where
   parseJSON = A.withObject "ImageResponseData" $ \o ->
-    (IRD_url      <$> (o A..: "url")) <|>
-    (IRD_b64_json <$> (o A..: "b64_json")) <|>
-    fail "ImageResponseData unexpected data"
+    (IRD_url <$> (o A..: "url"))
+      <|> (IRD_b64_json <$> (o A..: "b64_json"))
+      <|> fail "ImageResponseData unexpected data"
 
 data ImageResponse = ImageResponse
   { irCreated :: TimeStamp,
@@ -410,18 +410,18 @@ data ImageResponseFormat
 
 instance ToJSON ImageResponseFormat where
   toJSON = \case
-    IRF_url      -> A.String "url"
+    IRF_url -> A.String "url"
     IRF_b64_json -> A.String "b64_json"
 
 instance FromJSON ImageResponseFormat where
   parseJSON = A.withText "ImageResponseFormat" $ \t -> do
     case t of
-      "url"
-        -> pure IRF_url
-      "b64_json"
-        -> pure IRF_b64_json
-      xs
-        -> fail $ "ImageResponseFormat unexpected type: " <> T.unpack xs
+      "url" ->
+        pure IRF_url
+      "b64_json" ->
+        pure IRF_b64_json
+      xs ->
+        fail $ "ImageResponseFormat unexpected type: " <> T.unpack xs
 
 -- | Image create API
 data ImageCreate = ImageCreate
@@ -625,7 +625,6 @@ newtype FileDeleteConfirmation = FileDeleteConfirmation
   }
   deriving stock (Eq)
   deriving newtype (IsString, Show)
-
 
 $(deriveJSON (jsonOpts 3) ''FileDeleteConfirmation)
 

@@ -1,5 +1,6 @@
 module HelperSpec (helperSpec) where
 
+import Common.Client.Internal.Helpers
 import Control.Exception.Base
 import qualified Data.ByteString as BS
 import Data.IORef
@@ -8,7 +9,6 @@ import qualified Data.Sequence as Seq
 import Network.HTTP.Types.Header
 import Network.HTTP.Types.Status
 import Network.HTTP.Types.Version
-import OpenAI.Client.Internal.Helpers
 import Servant.Client
 import Servant.Client.Core.Request
 import System.Exit

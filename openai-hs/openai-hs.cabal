@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 07b1c878dc58fbadef2ced7a76a9aee5233a21e8f8b727916096d8888f09cc15
+-- hash: 32572cc23a370714dffdc7e9257a7675f86c7fd866cca3dac8a66202a374e2b6
 
 name:           openai-hs
 version:        0.3.0.1
@@ -28,8 +28,9 @@ source-repository head
 
 library
   exposed-modules:
+      Cohere.Client
+      Common.Client.Internal.Helpers
       OpenAI.Client
-      OpenAI.Client.Internal.Helpers
   other-modules:
       Paths_openai_hs
   hs-source-dirs:

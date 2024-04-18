@@ -108,13 +108,13 @@ module OpenAI.Client
 where
 
 import Control.Monad.IO.Class (MonadIO(..))
+import Common.Client.Internal.Helpers
 import qualified Data.ByteString.Lazy as BSL
 import Data.Proxy
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Network.HTTP.Client (Manager)
 import OpenAI.Api
-import OpenAI.Client.Internal.Helpers
 import OpenAI.Resources
 import Servant.API
 import Servant.Auth.Client

@@ -2,7 +2,7 @@
 
 -- | Private helper functions. Note that all contents of this module are excluded
 -- from the versioning scheme.
-module OpenAI.Client.Internal.Helpers where
+module Common.Client.Internal.Helpers where
 
 import Network.HTTP.Types.Status
 import Servant.Client

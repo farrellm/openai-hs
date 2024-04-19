@@ -3,8 +3,6 @@ cabal-version: 1.12
 -- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
---
--- hash: 32572cc23a370714dffdc7e9257a7675f86c7fd866cca3dac8a66202a374e2b6
 
 name:           openai-hs
 version:        0.3.0.1
@@ -28,6 +26,7 @@ source-repository head
 
 library
   exposed-modules:
+      Anthropic.Client
       Cohere.Client
       Common.Client.Internal.Helpers
       OpenAI.Client

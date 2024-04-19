@@ -26,6 +26,8 @@ source-repository head
 
 library
   exposed-modules:
+      Anthropic.Api
+      Anthropic.Resources
       Cohere.Api
       Cohere.Resources
       Common.Internal.Aeson

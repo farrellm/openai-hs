@@ -1,9 +1,7 @@
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module OpenAI.Resources
   ( -- * Core Types
@@ -34,13 +32,17 @@ module OpenAI.Resources
     ChatResponseFormat (..),
     ChatTool (..),
     ChatToolType (..),
-    ChatToolCall (..),
     defaultChatCompletionRequest,
+
+    -- * Edits
+    EditCreate (..),
+    EditChoice (..),
+    EditResponse (..),
+    defaultEditCreate,
 
     -- * Images
     ImageResponse (..),
     ImageResponseData (..),
-    ImageResponseFormat (..),
     ImageCreate (..),
     ImageEditRequest (..),
     ImageVariationRequest (..),
@@ -88,25 +90,26 @@ module OpenAI.Resources
   )
 where
 
-import Common.Internal.Aeson
-import Control.Applicative ((<|>))
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as BSL
 import Data.Maybe (catMaybes)
-import Data.String (IsString (..))
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Data.Vector as V
-import GHC.Exts (IsList)
 import Network.Mime (defaultMimeLookup)
+import OpenAI.Internal.Aeson
 import Servant.API
 import Servant.Multipart.API
 
+fib :: Int -> Int
+fib 0 = 0
+fib n = fib (n - 1) + fib (n - 2)
+
 -- | A 'UTCTime' wrapper that has unix timestamp JSON representation
 newtype TimeStamp = TimeStamp {unTimeStamp :: UTCTime}
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 instance A.ToJSON TimeStamp where
   toJSON = A.Number . fromRational . toRational . utcTimeToPOSIXSeconds . unTimeStamp
@@ -126,8 +129,17 @@ instance ToHttpApiData TimeStamp where
 newtype OpenAIList a = OpenAIList
   { olData :: V.Vector a
   }
-  deriving stock (Eq, Functor)
-  deriving newtype (Applicative, IsList, Monoid, Semigroup, Show)
+  deriving (Show, Eq, Functor)
+
+instance Semigroup (OpenAIList a) where
+  (<>) a b = OpenAIList (olData a <> olData b)
+
+instance Monoid (OpenAIList a) where
+  mempty = OpenAIList mempty
+
+instance Applicative OpenAIList where
+  pure = OpenAIList . pure
+  (<*>) go x = OpenAIList (olData go <*> olData x)
 
 $(deriveJSON (jsonOpts 2) ''OpenAIList)
 
@@ -140,12 +152,6 @@ data Usage = Usage
 
 $(deriveJSON (jsonOpts 2) ''Usage)
 
-instance Semigroup Usage where
-  Usage a1 a2 a3 <> Usage b1 b2 b3 = Usage (a1 + b1) (a2 + b2) (a3 + b3)
-
-instance Monoid Usage where
-  mempty = Usage 0 0 0
-
 ------------------------
 ------ Model API
 ------------------------
@@ -153,7 +159,8 @@ instance Monoid Usage where
 data Model = Model
   { mId :: ModelId,
     mObject :: T.Text,
-    mOwnedBy :: T.Text
+    mOwnedBy :: T.Text,
+    mPermission :: [A.Object] -- TODO 2023.03.22: Docs do not say what this is
   }
   deriving (Show, Eq)
 
@@ -163,7 +170,7 @@ newtype ModelId = ModelId {unModelId :: T.Text}
 $(deriveJSON (jsonOpts 1) ''Model)
 
 ------------------------
------- Completions API (legacy)
+------ Completions API
 ------------------------
 
 data CompletionCreate = CompletionCreate
@@ -298,6 +305,18 @@ instance A.ToJSON ChatMessage where
             ("name" A..=) <$> name
           ]
 
+data ChatResponseFormat
+  = CRF_json_object
+  deriving (Show, Eq)
+
+instance A.ToJSON ChatResponseFormat where
+  toJSON CRF_json_object =
+    A.object $ ["type" A..= T.pack "json_object"]
+
+instance A.FromJSON ChatResponseFormat where
+  parseJSON = A.withObject "ChatResponseFormat" $ \_obj ->
+    pure CRF_json_object
+
 data ChatFunction = ChatFunction
   { chfName :: T.Text,
     chfDescription :: T.Text,
@@ -326,6 +345,7 @@ instance FromJSON ChatFunctionCallStrategy where
 
 data ChatToolType
   = CTT_function
+  | CTT__
   deriving (Show, Eq)
 
 data ChatTool = ChatTool
@@ -360,60 +380,37 @@ instance FromJSON ChatToolChoice where
 data ChatCompletionRequest = ChatCompletionRequest
   { chcrModel :: ModelId,
     chcrMessages :: [ChatMessage],
+    chcrResponseFormat :: Maybe ChatResponseFormat,
     chcrTools :: Maybe [ChatTool],
     chcrToolChoice :: Maybe ChatToolChoice,
     chcrTemperature :: Maybe Double,
     chcrTopP :: Maybe Double,
     chcrN :: Maybe Int,
-    chcrSeed :: Maybe Int,
     chcrStream :: Maybe Bool,
     chcrStop :: Maybe (V.Vector T.Text),
     chcrMaxTokens :: Maybe Int,
     chcrPresencePenalty :: Maybe Double,
-    chcrResponseFormat :: Maybe ChatResponseFormat,
     chcrFrequencyPenalty :: Maybe Double,
     chcrLogitBias :: Maybe (V.Vector Double),
     chcrUser :: Maybe String
   }
   deriving (Show, Eq)
 
-data ChatResponseFormat
-  = RF_text
-  | RF_json_object
-  deriving (Show, Eq)
-
-instance ToJSON ChatResponseFormat where
-  toJSON = \case
-    RF_text -> A.object ["type" A..= A.String "text"]
-    RF_json_object -> A.object ["type" A..= A.String "json_object"]
-
-instance FromJSON ChatResponseFormat where
-  parseJSON = A.withObject "ChatResponseFormat" $ \o -> do
-    rt <- o A..: "type"
-    case rt of
-      "text" ->
-        pure RF_text
-      "json_object" ->
-        pure RF_json_object
-      xs ->
-        fail $ "ChatResponseFormat unexpected type: " <> T.unpack xs
-
 defaultChatCompletionRequest :: ModelId -> [ChatMessage] -> ChatCompletionRequest
 defaultChatCompletionRequest model messages =
   ChatCompletionRequest
     { chcrModel = model,
       chcrMessages = messages,
+      chcrResponseFormat = Nothing,
       chcrTools = Nothing,
       chcrToolChoice = Nothing,
       chcrTemperature = Nothing,
       chcrTopP = Nothing,
       chcrN = Nothing,
-      chcrSeed = Nothing,
       chcrStream = Nothing,
       chcrStop = Nothing,
       chcrMaxTokens = Nothing,
       chcrPresencePenalty = Nothing,
-      chcrResponseFormat = Nothing,
       chcrFrequencyPenalty = Nothing,
       chcrLogitBias = Nothing,
       chcrUser = Nothing
@@ -438,7 +435,7 @@ data ChatResponse = ChatResponse
     chrObject :: T.Text,
     chrCreated :: Int,
     chrModel :: T.Text,
-    chrSystemFingerprint :: Maybe T.Text,
+    chrSystemFingerprint :: T.Text,
     chrChoices :: [ChatChoice],
     chrUsage :: Usage
   }
@@ -452,24 +449,56 @@ $(deriveJSON (jsonOpts 4) ''ChatChoice)
 $(deriveJSON (jsonOpts 3) ''ChatResponse)
 
 ------------------------
+------ Edits API
+------------------------
+
+data EditCreate = EditCreate
+  { edcrModel :: ModelId,
+    edcrInput :: Maybe T.Text,
+    edcrInstruction :: T.Text,
+    edcrN :: Maybe Int,
+    edcrTemperature :: Maybe Double,
+    edcrTopP :: Maybe Double
+  }
+  deriving (Show, Eq)
+
+defaultEditCreate :: ModelId -> T.Text -> T.Text -> EditCreate
+defaultEditCreate model input instruction =
+  EditCreate
+    { edcrModel = model,
+      edcrInput = Just input,
+      edcrInstruction = instruction,
+      edcrN = Nothing,
+      edcrTemperature = Nothing,
+      edcrTopP = Nothing
+    }
+
+data EditChoice = EditChoice
+  { edchText :: T.Text,
+    edchIndex :: Int
+  }
+  deriving (Show, Eq)
+
+data EditResponse = EditResponse
+  { edrObject :: T.Text,
+    edrCreated :: Int,
+    edrChoices :: [EditChoice],
+    edrUsage :: Usage
+  }
+  deriving (Show, Eq)
+
+$(deriveJSON (jsonOpts 4) ''EditCreate)
+$(deriveJSON (jsonOpts 4) ''EditChoice)
+$(deriveJSON (jsonOpts 3) ''EditResponse)
+
+------------------------
 ------ Images API
 ------------------------
 
-data ImageResponseData
-  = IRD_url T.Text
-  | IRD_b64_json T.Text
+data ImageResponseData = ImageResponseData
+  { irdUrl :: T.Text
+  }
   deriving (Show, Eq)
-
-instance ToJSON ImageResponseData where
-  toJSON = \case
-    IRD_url d -> A.object ["url" A..= A.String d]
-    IRD_b64_json d -> A.object ["b64_json" A..= A.String d]
-
-instance FromJSON ImageResponseData where
-  parseJSON = A.withObject "ImageResponseData" $ \o ->
-    (IRD_url <$> (o A..: "url"))
-      <|> (IRD_b64_json <$> (o A..: "b64_json"))
-      <|> fail "ImageResponseData unexpected data"
 
 data ImageResponse = ImageResponse
   { irCreated :: TimeStamp,
@@ -477,35 +506,15 @@ data ImageResponse = ImageResponse
   }
   deriving (Show, Eq)
 
+$(deriveJSON (jsonOpts 3) ''ImageResponseData)
 $(deriveJSON (jsonOpts 2) ''ImageResponse)
-
-data ImageResponseFormat
-  = IRF_url
-  | IRF_b64_json
-  deriving (Show, Eq)
-
-instance ToJSON ImageResponseFormat where
-  toJSON = \case
-    IRF_url -> A.String "url"
-    IRF_b64_json -> A.String "b64_json"
-
-instance FromJSON ImageResponseFormat where
-  parseJSON = A.withText "ImageResponseFormat" $ \t -> do
-    case t of
-      "url" ->
-        pure IRF_url
-      "b64_json" ->
-        pure IRF_b64_json
-      xs ->
-        fail $ "ImageResponseFormat unexpected type: " <> T.unpack xs
 
 -- | Image create API
 data ImageCreate = ImageCreate
   { icPrompt :: T.Text,
-    icModel :: Maybe ModelId,
     icN :: Maybe Int,
     icSize :: Maybe T.Text,
-    icResponseFormat :: Maybe ImageResponseFormat,
+    icResponseFormat :: Maybe T.Text,
     icUser :: Maybe T.Text
   }
   deriving (Show, Eq)
@@ -650,13 +659,12 @@ data FineTuneHunk = FineTuneHunk
 
 data FileHunk
   = FhFineTune FineTuneHunk
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 $(deriveJSON (jsonOpts 3) ''FineTuneHunk)
 
 newtype FileId = FileId {unFileId :: T.Text}
-  deriving stock (Eq)
-  deriving newtype (IsString, ToJSON, FromJSON, ToHttpApiData, Show)
+  deriving (Show, Eq, ToJSON, FromJSON, ToHttpApiData)
 
 data File = File
   { fId :: FileId,
@@ -666,7 +674,7 @@ data File = File
     fFilename :: T.Text,
     fPurpose :: T.Text
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 $(deriveJSON (jsonOpts 1) ''File)
 
@@ -675,7 +683,7 @@ data FileCreate = FileCreate
   { fcPurpose :: T.Text,
     fcDocuments :: [FileHunk]
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 packDocuments :: [FileHunk] -> BSL.ByteString
 packDocuments docs =
@@ -696,11 +704,10 @@ instance ToMultipart Mem FileCreate where
       ]
 
 -- | File delete API
-newtype FileDeleteConfirmation = FileDeleteConfirmation
+data FileDeleteConfirmation = FileDeleteConfirmation
   { fdcId :: FileId
   }
-  deriving stock (Eq)
-  deriving newtype (IsString, Show)
+  deriving (Show, Eq)
 
 $(deriveJSON (jsonOpts 3) ''FileDeleteConfirmation)
 
@@ -715,15 +722,14 @@ $(deriveJSON (jsonOpts 3) ''FileDeleteConfirmation)
 ------------------------
 
 newtype EngineId = EngineId {unEngineId :: T.Text}
-  deriving stock (Eq)
-  deriving newtype (IsString, ToJSON, FromJSON, ToHttpApiData, Show)
+  deriving (Show, Eq, ToJSON, FromJSON, ToHttpApiData)
 
 data Engine = Engine
   { eId :: EngineId,
     eOwner :: T.Text,
     eReady :: Bool
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 $(deriveJSON (jsonOpts 1) ''Engine)
 
@@ -732,8 +738,7 @@ $(deriveJSON (jsonOpts 1) ''Engine)
 ------------------------
 
 newtype TextCompletionId = TextCompletionId {unTextCompletionId :: T.Text}
-  deriving stock (Eq)
-  deriving newtype (IsString, ToJSON, FromJSON, ToHttpApiData, Show)
+  deriving (Show, Eq, ToJSON, FromJSON, ToHttpApiData)
 
 data TextCompletionChoice = TextCompletionChoice
   { tccText :: T.Text,
@@ -741,7 +746,7 @@ data TextCompletionChoice = TextCompletionChoice
     tccLogProps :: Maybe Int,
     tccFinishReason :: T.Text
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 data TextCompletion = TextCompletion
   { tcId :: TextCompletionId,
@@ -749,7 +754,7 @@ data TextCompletion = TextCompletion
     tcModel :: T.Text,
     tcChoices :: V.Vector TextCompletionChoice
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 data TextCompletionCreate = TextCompletionCreate
   { tccrPrompt :: T.Text, -- TODO: support lists of strings
@@ -764,7 +769,7 @@ data TextCompletionCreate = TextCompletionCreate
     tccrFrequencyPenalty :: Maybe Double,
     tccrBestOf :: Maybe Int
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 -- | Applies API defaults, only passing a prompt.
 defaultEngineTextCompletionCreate :: T.Text -> TextCompletionCreate
@@ -791,14 +796,13 @@ $(deriveJSON (jsonOpts 4) ''TextCompletionCreate)
 ------ EngineEmbeddings API (deprecated)
 ------------------------
 
-newtype EngineEmbeddingCreate = EngineEmbeddingCreate
+data EngineEmbeddingCreate = EngineEmbeddingCreate
   {enecInput :: T.Text}
-  deriving stock (Eq)
-  deriving newtype (IsString, Show)
+  deriving (Show, Eq)
 
 data EngineEmbedding = EngineEmbedding
   {eneEmbedding :: V.Vector Double, eneIndex :: Int}
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 $(deriveJSON (jsonOpts 4) ''EngineEmbeddingCreate)
 $(deriveJSON (jsonOpts 3) ''EngineEmbedding)
@@ -809,8 +813,7 @@ $(deriveJSON (jsonOpts 3) ''EngineEmbedding)
 ------------------------
 
 newtype FineTuneId = FineTuneId {unFineTuneId :: T.Text}
-  deriving stock (Eq)
-  deriving newtype (IsString, ToJSON, FromJSON, ToHttpApiData, Show)
+  deriving (Show, Eq, ToJSON, FromJSON, ToHttpApiData)
 
 data FineTuneCreate = FineTuneCreate
   { ftcTrainingFile :: FileId,
@@ -824,7 +827,7 @@ data FineTuneCreate = FineTuneCreate
     ftcClassificationNClasses :: Maybe Int,
     ftcClassificationPositiveClass :: Maybe T.Text
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 defaultFineTuneCreate :: FileId -> FineTuneCreate
 defaultFineTuneCreate file =
@@ -846,7 +849,7 @@ data FineTuneEvent = FineTuneEvent
     fteLevel :: T.Text,
     fteMessage :: T.Text
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 data FineTune = FineTune
   { ftId :: FineTuneId,
@@ -856,7 +859,7 @@ data FineTune = FineTune
     ftTunedModel :: Maybe T.Text,
     ftStatus :: T.Text
   }
-  deriving stock (Show, Eq)
+  deriving (Show, Eq)
 
 $(deriveJSON (jsonOpts 3) ''FineTuneCreate)
 $(deriveJSON (jsonOpts 3) ''FineTuneEvent)

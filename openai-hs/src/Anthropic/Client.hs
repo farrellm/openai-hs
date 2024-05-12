@@ -38,15 +38,10 @@ import Anthropic.Api
 import Anthropic.Resources
 import Common.Client.Internal.Helpers
 import Control.Monad.IO.Class (MonadIO (..))
-import qualified Data.ByteString.Lazy as BSL
 import Data.Proxy
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import Network.HTTP.Client (Manager)
-import Servant.API
-import Servant.Auth.Client
 import Servant.Client
-import qualified Servant.Multipart.Client as MP
 
 -- | Your Anthropic API key. Can be obtained from the Anthropic dashboard. Format: @sk-<redacted>@
 type ApiKey = T.Text

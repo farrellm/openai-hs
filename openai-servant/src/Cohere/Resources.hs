@@ -32,15 +32,12 @@ where
 import Common.Internal.Aeson
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as BSL
-import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Data.Vector as V
-import Network.Mime (defaultMimeLookup)
 import Servant.API
-import Servant.Multipart.API
 
 -- | A 'UTCTime' wrapper that has unix timestamp JSON representation
 newtype TimeStamp = TimeStamp {unTimeStamp :: UTCTime}
@@ -73,7 +70,7 @@ $(deriveJSON (jsonOpts 2) ''Usage)
 ------ Model API
 ------------------------
 
-data Model = Model
+newtype Model = Model
   { mName :: T.Text
   }
   deriving (Show, Eq)

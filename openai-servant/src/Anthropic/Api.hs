@@ -4,11 +4,7 @@ module Anthropic.Api where
 import Anthropic.Resources
 import Data.Text (Text)
 import Servant.API
-import Servant.Auth
-import Servant.Auth.Client
-import Servant.Multipart.API
 
--- type AnthropicAuth = Auth '[Bearer] ()
 type AnthropicAuth = Header "x-api-key" Text
 
 type AnthropicVersion = Header "anthropic-version" Text

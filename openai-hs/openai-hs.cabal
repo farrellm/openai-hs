@@ -29,7 +29,9 @@ library
       Anthropic.Client
       Cohere.Client
       Common.Client.Internal.Helpers
+      Huggingface.Client
       OpenAI.Client
+      OpenRouter.Client
   other-modules:
       Paths_openai_hs
   hs-source-dirs:

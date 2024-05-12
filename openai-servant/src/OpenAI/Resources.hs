@@ -438,7 +438,7 @@ data ChatResponse = ChatResponse
     chrObject :: T.Text,
     chrCreated :: Int,
     chrModel :: T.Text,
-    chrSystemFingerprint :: T.Text,
+    chrSystemFingerprint :: Maybe T.Text,
     chrChoices :: [ChatChoice],
     chrUsage :: Usage
   }

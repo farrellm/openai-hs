@@ -5,7 +5,6 @@ import Cohere.Resources
 import Servant.API
 import Servant.Auth
 import Servant.Auth.Client
-import Servant.Multipart.API
 
 type CohereAuth = Auth '[Bearer] ()
 

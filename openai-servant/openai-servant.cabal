@@ -31,8 +31,11 @@ library
       Cohere.Api
       Cohere.Resources
       Common.Internal.Aeson
+      Huggingface.Api
+      Huggingface.Resources
       OpenAI.Api
       OpenAI.Resources
+      OpenRouter.Api
   other-modules:
       Paths_openai_servant
   hs-source-dirs:

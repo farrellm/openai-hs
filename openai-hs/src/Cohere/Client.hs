@@ -22,16 +22,13 @@ module Cohere.Client
 
     -- * Chat
     ChatRole (..),
-    ChatFunction (..),
-    ChatFunctionCall (..),
-    ChatFunctionCallStrategy (..),
     ChatMessage (..),
     ChatCompletionRequest (..),
-    ChatFinishReason (..),
     ChatResponse (..),
     ChatTool (..),
-    ChatToolType (..),
+    ChatToolResult (..),
     ChatToolCall (..),
+    ChatParameterDefinition (..),
     defaultChatCompletionRequest,
     completeChat,
   )

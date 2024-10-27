@@ -244,14 +244,14 @@ $(deriveJSON (jsonOpts' 3) ''ChatRole)
 
 data ChatFunctionCall = ChatFunctionCall
   { chfcName :: T.Text,
-    chfcArguments :: A.Value
+    chfcArguments :: A.Object
   }
   deriving (Eq, Show)
 
 instance A.FromJSON ChatFunctionCall where
   parseJSON = A.withObject "ChatFunctionCall" $ \obj -> do
     name <- obj A..: "name"
-    arguments <- obj A..: "arguments" >>= A.withEmbeddedJSON "Arguments" pure
+    arguments <- obj A..: "arguments" >>= A.withEmbeddedJSON "Arguments" A.parseJSON
 
     pure $ ChatFunctionCall {chfcName = name, chfcArguments = arguments}
 
@@ -262,9 +262,15 @@ instance A.ToJSON ChatFunctionCall where
         "arguments" A..= T.decodeUtf8 (BSL.toStrict (A.encode arguments))
       ]
 
+data ChatToolType
+  = CTT_function
+  deriving (Show, Eq)
+
+$(deriveJSON (jsonOpts' 4) ''ChatToolType)
+
 data ChatToolCall = ChatToolCall
   { chtcId :: T.Text,
-    chtcType :: T.Text,
+    chtcType :: ChatToolType,
     chtcFunction :: ChatFunctionCall
   }
   deriving (Eq, Show)
@@ -275,7 +281,8 @@ data ChatMessage = ChatMessage
   { chmContent :: Maybe T.Text,
     chmRole :: ChatRole,
     chmName :: Maybe T.Text,
-    chmToolCalls :: Maybe [ChatToolCall]
+    chmToolCalls :: Maybe [ChatToolCall],
+    chmToolCallId :: Maybe T.Text
   }
   deriving (Show, Eq)
 
@@ -286,22 +293,36 @@ instance A.FromJSON ChatMessage where
       <*> obj A..: "role"
       <*> obj A..:? "name"
       <*> obj A..:? "tool_calls"
+      <*> obj A..:? "tool_call_id"
 
 instance A.ToJSON ChatMessage where
-  toJSON (ChatMessage {chmContent = content, chmRole = role, chmName = name, chmToolCalls = toolCalls}) =
+  toJSON (ChatMessage {chmContent = content, chmRole = role, chmName = name, chmToolCalls = toolCalls, chmToolCallId = toolCallId}) =
     A.object $
       [ "content" A..= content,
         "role" A..= role
       ]
         ++ catMaybes
           [ ("tool_calls" A..=) <$> toolCalls,
-            ("name" A..=) <$> name
+            ("name" A..=) <$> name,
+            ("tool_call_id" A..=) <$> toolCallId
           ]
+
+data ChatJsonSchema = ChatJsonSchema
+  { chjsName :: T.Text,
+    chjsStrict :: Bool,
+    chjsSchema :: A.Value,
+    chjsRequired :: [T.Text],
+    chjsAdditionalProperties :: Bool
+  }
+  deriving (Show, Eq)
+
+$(deriveJSON (jsonOpts 4) ''ChatJsonSchema)
 
 data ChatFunction = ChatFunction
   { chfName :: T.Text,
     chfDescription :: T.Text,
-    chfParameters :: Maybe A.Value
+    chfParameters :: Maybe A.Value,
+    chfStrict :: Maybe Bool
   }
   deriving (Show, Eq)
 
@@ -323,10 +344,6 @@ instance FromJSON ChatFunctionCallStrategy where
   parseJSON xs = flip (A.withObject "ChatFunctionCallStrategy") xs $ \o -> do
     functionName <- o A..: "name"
     pure $ CFCS_name functionName
-
-data ChatToolType
-  = CTT_function
-  deriving (Show, Eq)
 
 data ChatTool = ChatTool
   { chtType :: ChatToolType,
@@ -380,12 +397,18 @@ data ChatCompletionRequest = ChatCompletionRequest
 data ChatResponseFormat
   = RF_text
   | RF_json_object
+  | RF_json_schema ChatJsonSchema
   deriving (Show, Eq)
 
 instance ToJSON ChatResponseFormat where
   toJSON = \case
     RF_text -> A.object ["type" A..= A.String "text"]
     RF_json_object -> A.object ["type" A..= A.String "json_object"]
+    (RF_json_schema s) ->
+      A.object
+        [ "type" A..= T.pack "json_schema",
+          "json_schema" A..= A.toJSON s
+        ]
 
 instance FromJSON ChatResponseFormat where
   parseJSON = A.withObject "ChatResponseFormat" $ \o -> do
@@ -444,7 +467,6 @@ data ChatResponse = ChatResponse
   }
 
 $(deriveJSON (jsonOpts 3) ''ChatFunction)
-$(deriveJSON (jsonOpts' 4) ''ChatToolType)
 $(deriveJSON (jsonOpts 3) ''ChatTool)
 $(deriveJSON (jsonOpts 4) ''ChatCompletionRequest)
 $(deriveJSON (jsonOpts' 4) ''ChatFinishReason)

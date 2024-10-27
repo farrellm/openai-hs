@@ -15,25 +15,21 @@ module Cohere.Resources
 
     -- * Chat
     ChatRole (..),
-    ChatFunction (..),
-    ChatFunctionCall (..),
-    ChatFunctionCallStrategy (..),
-    ChatFinishReason (..),
     ChatMessage (..),
     ChatCompletionRequest (..),
     ChatResponse (..),
     ChatTool (..),
-    ChatToolType (..),
+    ChatToolResult (..),
     ChatToolCall (..),
+    ChatParameterDefinition (..),
     defaultChatCompletionRequest,
   )
 where
 
 import Common.Internal.Aeson
 import qualified Data.Aeson as A
-import qualified Data.ByteString.Lazy as BSL
+import qualified Data.Map as M
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import Data.Time
 import Data.Time.Clock.POSIX
 import qualified Data.Vector as V
@@ -95,34 +91,14 @@ data ChatRole
   = CR_SYSTEM
   | CR_USER
   | CR_CHATBOT
+  | CR_TOOL
   deriving (Show, Eq)
 
 $(deriveJSON (jsonOpts' 3) ''ChatRole)
 
-data ChatFunctionCall = ChatFunctionCall
-  { chfcName :: T.Text,
-    chfcArguments :: A.Value
-  }
-  deriving (Eq, Show)
-
-instance A.FromJSON ChatFunctionCall where
-  parseJSON = A.withObject "ChatFunctionCall" $ \obj -> do
-    name <- obj A..: "name"
-    arguments <- obj A..: "arguments" >>= A.withEmbeddedJSON "Arguments" pure
-
-    pure $ ChatFunctionCall {chfcName = name, chfcArguments = arguments}
-
-instance A.ToJSON ChatFunctionCall where
-  toJSON (ChatFunctionCall {chfcName = name, chfcArguments = arguments}) =
-    A.object
-      [ "name" A..= name,
-        "arguments" A..= T.decodeUtf8 (BSL.toStrict (A.encode arguments))
-      ]
-
 data ChatToolCall = ChatToolCall
-  { chtcId :: T.Text,
-    chtcType :: T.Text,
-    chtcFunction :: ChatFunctionCall
+  { chtcName :: T.Text,
+    chtcParameters :: A.Object
   }
   deriving (Eq, Show)
 
@@ -134,77 +110,33 @@ data ChatMessage = ChatMessage
   }
   deriving (Show, Eq)
 
-instance A.FromJSON ChatMessage where
-  parseJSON = A.withObject "ChatMessage" $ \obj ->
-    ChatMessage
-      <$> obj A..: "role"
-      <*> obj A..: "message"
+$(deriveJSON (jsonOpts 3) ''ChatMessage)
 
-instance A.ToJSON ChatMessage where
-  toJSON (ChatMessage {chmMessage = message, chmRole = role}) =
-    A.object $
-      [ "role" A..= role,
-        "message" A..= message
-      ]
-
-data ChatFunction = ChatFunction
-  { chfName :: T.Text,
-    chfDescription :: T.Text,
-    chfParameters :: Maybe A.Value
+data ChatParameterDefinition = ChatParameterDefinition
+  { chpdDescription :: T.Text,
+    chpdType :: T.Text,
+    chpdRequired :: Bool
   }
   deriving (Show, Eq)
 
-data ChatFunctionCallStrategy
-  = CFCS_auto
-  | CFCS_none
-  | CFCS_name T.Text
-  deriving (Show, Eq)
-
-instance ToJSON ChatFunctionCallStrategy where
-  toJSON = \case
-    CFCS_auto -> A.String "auto"
-    CFCS_none -> A.String "none"
-    CFCS_name functionName -> A.object ["name" A..= A.toJSON functionName]
-
-instance FromJSON ChatFunctionCallStrategy where
-  parseJSON (A.String "auto") = pure CFCS_auto
-  parseJSON (A.String "none") = pure CFCS_none
-  parseJSON xs = flip (A.withObject "ChatFunctionCallStrategy") xs $ \o -> do
-    functionName <- o A..: "name"
-    pure $ CFCS_name functionName
-
-data ChatToolType
-  = CTT_function
-  deriving (Show, Eq)
+$(deriveJSON (jsonOpts 4) ''ChatParameterDefinition)
 
 data ChatTool = ChatTool
-  { chtType :: ChatToolType,
-    chtFunction :: ChatFunction
+  { chtName :: T.Text,
+    chtDescription :: T.Text,
+    chtParameterDefinitions :: M.Map T.Text ChatParameterDefinition
   }
   deriving (Show, Eq)
 
-data ChatToolChoice
-  = CTC_auto
-  | CTC_none
-  | CTC_name T.Text
+$(deriveJSON (jsonOpts 3) ''ChatTool)
+
+data ChatToolResult = ChatToolResult
+  { chtrCall :: ChatToolCall,
+    chtrOutputs :: V.Vector A.Object
+  }
   deriving (Show, Eq)
 
-instance ToJSON ChatToolChoice where
-  toJSON = \case
-    CTC_auto -> A.String "auto"
-    CTC_none -> A.String "none"
-    CTC_name functionName ->
-      A.object
-        [ "type" A..= A.String "function",
-          "function" A..= A.object ["name" A..= A.toJSON functionName]
-        ]
-
-instance FromJSON ChatToolChoice where
-  parseJSON (A.String "auto") = pure CTC_auto
-  parseJSON (A.String "none") = pure CTC_none
-  parseJSON xs = flip (A.withObject "ChatToolChoice") xs $ \o -> do
-    functionName <- o A..: "name"
-    pure $ CTC_name functionName
+$(deriveJSON (jsonOpts 4) ''ChatToolResult)
 
 data ChatCompletionRequest = ChatCompletionRequest
   { chcrModel :: ModelId,
@@ -218,7 +150,9 @@ data ChatCompletionRequest = ChatCompletionRequest
     chcrP :: Maybe Double,
     chcrStopSequences :: Maybe (V.Vector T.Text),
     chcrFrequencyPenalty :: Maybe Double,
-    chcrPresencePenalty :: Maybe Double
+    chcrPresencePenalty :: Maybe Double,
+    chcrTools :: Maybe [ChatTool],
+    chcrToolResults :: Maybe [ChatToolResult]
   }
   deriving (Show, Eq)
 
@@ -236,26 +170,18 @@ defaultChatCompletionRequest model message =
       chcrP = Nothing,
       chcrStopSequences = Nothing,
       chcrPresencePenalty = Nothing,
-      chcrFrequencyPenalty = Nothing
+      chcrFrequencyPenalty = Nothing,
+      chcrTools = Nothing,
+      chcrToolResults = Nothing
     }
-
-data ChatFinishReason
-  = CFR_stop
-  | CFR_length
-  | CFR_contentFilter
-  | CFR_toolCalls
-  deriving (Show, Eq)
 
 data ChatResponse = ChatResponse
   { chrResponseId :: T.Text,
     chrText :: T.Text,
-    chrGenerationId :: T.Text
+    chrGenerationId :: T.Text,
+    chrToolCalls :: Maybe [ChatToolCall]
   }
   deriving (Show)
 
-$(deriveJSON (jsonOpts 3) ''ChatFunction)
-$(deriveJSON (jsonOpts' 4) ''ChatToolType)
-$(deriveJSON (jsonOpts 3) ''ChatTool)
 $(deriveJSON (jsonOpts 4) ''ChatCompletionRequest)
-$(deriveJSON (jsonOpts' 4) ''ChatFinishReason)
 $(deriveJSON (jsonOpts 3) ''ChatResponse)

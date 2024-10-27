@@ -68,7 +68,8 @@ apiTests2023 =
                     { chmRole = CR_user,
                       chmContent = Just "What is the opposite of up? Answer in one word with no punctuation.",
                       chmName = Nothing,
-                      chmToolCalls = Nothing
+                      chmToolCalls = Nothing,
+                      chmToolCallId = Nothing
                     }
                 ]
         res <- forceSuccess $ completeChat cli completion
@@ -82,13 +83,15 @@ apiTests2023 =
                     { chmRole = CR_assistant,
                       chmContent = Nothing,
                       chmName = Nothing,
-                      chmToolCalls = Nothing
+                      chmToolCalls = Nothing,
+                      chmToolCallId = Nothing
                     },
                   ChatMessage
                     { chmRole = CR_tool,
                       chmContent = Just "x",
                       chmName = Just "f",
-                      chmToolCalls = Nothing
+                      chmToolCalls = Nothing,
+                      chmToolCallId = Nothing
                     }
                 ]
         res <- forceSuccess $ completeChat cli completion

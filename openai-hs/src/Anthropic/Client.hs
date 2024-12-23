@@ -18,17 +18,17 @@ module Anthropic.Client
 
     -- * Chat
     ChatRole (..),
-    ChatFunction (..),
-    ChatFunctionCall (..),
-    ChatFunctionCallStrategy (..),
     ChatMessage (..),
+    ChatMessageContent (..),
+    ChatToolResult (..),
     ChatCompletionRequest (..),
     ChatStopReason (..),
     ChatContent (..),
+    ChatContentText (..),
+    ChatContentTool (..),
     ChatResponse (..),
     ChatTool (..),
-    ChatToolType (..),
-    ChatToolCall (..),
+    -- ChatToolType (..),
     defaultChatCompletionRequest,
     completeChat,
   )

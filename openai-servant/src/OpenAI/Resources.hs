@@ -35,6 +35,8 @@ module OpenAI.Resources
     ChatTool (..),
     ChatToolType (..),
     ChatToolCall (..),
+    ChatContent (..),
+    ChatContentPart (..),
     defaultChatCompletionRequest,
 
     -- * Images
@@ -238,6 +240,7 @@ data ChatRole
   | CR_user
   | CR_assistant
   | CR_tool
+  | CR_model
   deriving (Show, Eq)
 
 $(deriveJSON (jsonOpts' 3) ''ChatRole)
@@ -277,8 +280,31 @@ data ChatToolCall = ChatToolCall
 
 $(deriveJSON (jsonOpts 4) ''ChatToolCall)
 
+data ChatContentPart = ChatContentPart
+  { chcpType :: T.Text,
+    chcpText :: T.Text
+  }
+  deriving (Eq, Show)
+
+$(deriveJSON (jsonOpts 4) ''ChatContentPart)
+
+data ChatContent
+  = ContentText T.Text
+  | ContentArray [ChatContentPart]
+  deriving (Eq, Show)
+
+instance IsString ChatContent where
+  fromString = ContentText . T.pack
+
+instance A.FromJSON ChatContent where
+  parseJSON = A.withText "ChatContent" $ pure . ContentText
+
+instance A.ToJSON ChatContent where
+  toJSON (ContentText t) = A.toJSON t
+  toJSON (ContentArray t) = A.toJSON t
+
 data ChatMessage = ChatMessage
-  { chmContent :: Maybe T.Text,
+  { chmContent :: Maybe ChatContent,
     chmRole :: ChatRole,
     chmName :: Maybe T.Text,
     chmToolCalls :: Maybe [ChatToolCall],
@@ -457,7 +483,7 @@ data ChatChoice = ChatChoice
   deriving (Show, Eq)
 
 data ChatResponse = ChatResponse
-  { chrId :: T.Text,
+  { chrId :: Maybe T.Text,
     chrObject :: T.Text,
     chrCreated :: Int,
     chrModel :: T.Text,

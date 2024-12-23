@@ -41,6 +41,8 @@ module OpenAI.Client
     ChatTool (..),
     ChatToolType (..),
     ChatToolCall (..),
+    ChatContent (..),
+    ChatContentPart (..),
     defaultChatCompletionRequest,
     completeChat,
 

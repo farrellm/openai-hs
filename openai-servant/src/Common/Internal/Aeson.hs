@@ -1,4 +1,4 @@
-module Common.Internal.Aeson (jsonOpts, jsonOpts', deriveJSON, ToJSON, FromJSON) where
+module Common.Internal.Aeson (jsonOpts, jsonOpts', jsonOpts'', deriveJSON, ToJSON, FromJSON) where
 
 import Data.Aeson
 import Data.Aeson.TH (deriveJSON)
@@ -19,4 +19,12 @@ jsonOpts' x =
       constructorTagModifier = quietSnake . drop x,
       omitNothingFields = True,
       tagSingleConstructors = True
+    }
+
+jsonOpts'' :: Int -> Options
+jsonOpts'' x =
+  defaultOptions
+    { fieldLabelModifier = drop x,
+      constructorTagModifier = drop x,
+      omitNothingFields = True
     }

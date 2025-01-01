@@ -94,7 +94,7 @@ data ChatRole
   | CR_TOOL
   deriving (Show, Eq)
 
-$(deriveJSON (jsonOpts' 3) ''ChatRole)
+$(deriveJSON (jsonOpts'' 3) ''ChatRole)
 
 data ChatToolCall = ChatToolCall
   { chtcName :: T.Text,
@@ -106,7 +106,8 @@ $(deriveJSON (jsonOpts 4) ''ChatToolCall)
 
 data ChatMessage = ChatMessage
   { chmRole :: ChatRole,
-    chmMessage :: T.Text
+    chmMessage :: Maybe T.Text,
+    chmToolResults :: Maybe [A.Object]
   }
   deriving (Show, Eq)
 
@@ -179,7 +180,8 @@ data ChatResponse = ChatResponse
   { chrResponseId :: T.Text,
     chrText :: T.Text,
     chrGenerationId :: T.Text,
-    chrToolCalls :: Maybe [ChatToolCall]
+    chrToolCalls :: Maybe [ChatToolCall],
+    chrChatHistory :: [ChatMessage]
   }
   deriving (Show)
 

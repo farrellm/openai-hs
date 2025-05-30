@@ -43,6 +43,8 @@ module OpenAI.Client
     ChatToolCall (..),
     ChatContent (..),
     ChatContentPart (..),
+    ChatPrediction (..),
+    ChatPredictionType (..),
     defaultChatCompletionRequest,
     completeChat,
 

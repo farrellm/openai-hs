@@ -37,6 +37,8 @@ module OpenAI.Resources
     ChatToolCall (..),
     ChatContent (..),
     ChatContentPart (..),
+    ChatPrediction (..),
+    ChatPredictionType (..),
     defaultChatCompletionRequest,
 
     -- * Images
@@ -133,20 +135,37 @@ newtype OpenAIList a = OpenAIList
 
 $(deriveJSON (jsonOpts 2) ''OpenAIList)
 
-data Usage = Usage
-  { usPromptTokens :: Int,
-    usCompletionTokens :: Int,
-    usTotalTokens :: Int
+data UsageDetails = UsageDetails
+  { usdReasoningTokens :: Int,
+    usdAcceptedPredictionTokens :: Int,
+    usdRejectedPredictionTokens :: Int
   }
   deriving (Show, Eq)
 
+data Usage = Usage
+  { usPromptTokens :: Int,
+    usCompletionTokens :: Int,
+    usTotalTokens :: Int,
+    usCompletionTokensDetails :: Maybe UsageDetails
+  }
+  deriving (Show, Eq)
+
+$(deriveJSON (jsonOpts 3) ''UsageDetails)
 $(deriveJSON (jsonOpts 2) ''Usage)
 
+instance Semigroup UsageDetails where
+  UsageDetails a1 a2 a3 <> UsageDetails b1 b2 b3 =
+    UsageDetails (a1 + b1) (a2 + b2) (a3 + b3)
+
+instance Monoid UsageDetails where
+  mempty = UsageDetails 0 0 0
+
 instance Semigroup Usage where
-  Usage a1 a2 a3 <> Usage b1 b2 b3 = Usage (a1 + b1) (a2 + b2) (a3 + b3)
+  Usage a1 a2 a3 a4 <> Usage b1 b2 b3 b4 =
+    Usage (a1 + b1) (a2 + b2) (a3 + b3) (a4 <> b4)
 
 instance Monoid Usage where
-  mempty = Usage 0 0 0
+  mempty = Usage 0 0 0 mempty
 
 ------------------------
 ------ Model API
@@ -237,6 +256,7 @@ $(deriveJSON (jsonOpts 2) ''CompletionResponse)
 
 data ChatRole
   = CR_system
+  | CR_developer
   | CR_user
   | CR_assistant
   | CR_tool
@@ -400,6 +420,15 @@ instance FromJSON ChatToolChoice where
     functionName <- o A..: "name"
     pure $ CTC_name functionName
 
+data ChatPredictionType = CPT_content
+  deriving (Show, Eq)
+
+data ChatPrediction = ChatPrediction
+  { chpType :: ChatPredictionType,
+    chpContent :: T.Text
+  }
+  deriving (Show, Eq)
+
 data ChatCompletionRequest = ChatCompletionRequest
   { chcrModel :: ModelId,
     chcrMessages :: [ChatMessage],
@@ -408,10 +437,11 @@ data ChatCompletionRequest = ChatCompletionRequest
     chcrTemperature :: Maybe Double,
     chcrTopP :: Maybe Double,
     chcrN :: Maybe Int,
+    chcrPrediction :: Maybe ChatPrediction,
     chcrSeed :: Maybe Int,
     chcrStream :: Maybe Bool,
     chcrStop :: Maybe (V.Vector T.Text),
-    chcrMaxTokens :: Maybe Int,
+    chcrMaxCompletionTokens :: Maybe Int,
     chcrPresencePenalty :: Maybe Double,
     chcrResponseFormat :: Maybe ChatResponseFormat,
     chcrFrequencyPenalty :: Maybe Double,
@@ -457,10 +487,11 @@ defaultChatCompletionRequest model messages =
       chcrTemperature = Nothing,
       chcrTopP = Nothing,
       chcrN = Nothing,
+      chcrPrediction = Nothing,
       chcrSeed = Nothing,
       chcrStream = Nothing,
       chcrStop = Nothing,
-      chcrMaxTokens = Nothing,
+      chcrMaxCompletionTokens = Nothing,
       chcrPresencePenalty = Nothing,
       chcrResponseFormat = Nothing,
       chcrFrequencyPenalty = Nothing,
@@ -478,7 +509,7 @@ data ChatFinishReason
 data ChatChoice = ChatChoice
   { chchIndex :: Int,
     chchMessage :: ChatMessage,
-    chchFinishReason :: ChatFinishReason
+    chchFinishReason :: Maybe ChatFinishReason
   }
   deriving (Show, Eq)
 
@@ -494,6 +525,8 @@ data ChatResponse = ChatResponse
 
 $(deriveJSON (jsonOpts 3) ''ChatFunction)
 $(deriveJSON (jsonOpts 3) ''ChatTool)
+$(deriveJSON (jsonOpts' 4) ''ChatPredictionType)
+$(deriveJSON (jsonOpts 3) ''ChatPrediction)
 $(deriveJSON (jsonOpts 4) ''ChatCompletionRequest)
 $(deriveJSON (jsonOpts' 4) ''ChatFinishReason)
 $(deriveJSON (jsonOpts 4) ''ChatChoice)

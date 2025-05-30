@@ -34,10 +34,20 @@ data GeneratePartFuncResponse = GeneratePartFuncResponse
 $(deriveJSON (jsonOpts 4) ''GeneratePartFuncCall)
 $(deriveJSON (jsonOpts 4) ''GeneratePartFuncResponse)
 
+data GenerateInlineData = GenerateInlineData
+  { gid_data :: T.Text,
+    gid_mimeType :: T.Text
+  }
+  deriving (Show, Eq)
+
+$(deriveJSON (jsonOpts'' 4) ''GenerateInlineData)
+
 data GeneratePart = GeneratePart
   { gp_text :: Maybe T.Text,
     gp_functionCall :: Maybe GeneratePartFuncCall,
-    gp_functionResponse :: Maybe GeneratePartFuncResponse
+    gp_functionResponse :: Maybe GeneratePartFuncResponse,
+    gp_thought :: Maybe Bool,
+    gp_inlineData :: Maybe GenerateInlineData
   }
   deriving (Show, Eq)
 
@@ -89,12 +99,44 @@ data FunctionDeclarations = FunctionDeclarations
   }
   deriving (Show, Eq)
 
+data ThinkingConfig = ThinkingConfig
+  { tc_includeThoughts :: Maybe Bool,
+    tc_thinkingBudget :: Maybe Int
+  }
+  deriving (Show, Eq)
+
+data ResponseModality = RM_Text | RM_Image
+  deriving (Show, Eq)
+
+$(deriveJSON (jsonOpts'' 3) ''ResponseModality)
+
+data GenerateContentConfig = GenerateContentConfig
+  { gcc_thinkingConfig :: Maybe ThinkingConfig,
+    gcc_responseModalities :: Maybe [ResponseModality],
+    gcc_responseMimeType :: T.Text
+  }
+  deriving (Show, Eq)
+
+data ImagenInstance = ImagenInstance
+  { ii_prompt :: T.Text
+  }
+  deriving (Show, Eq)
+
+data ImagenParameters = ImagenParameters
+  { ip_sampleCount :: Int
+  }
+  deriving (Show, Eq)
+
 data GenerateContentRequest = GenerateContentRequest
-  { gcr_contents :: [GenerateContent],
+  { gcr_contents :: Maybe [GenerateContent],
     gcr_system_instruction :: Maybe GenerateContent,
     gcr_safetySettings :: Maybe [SafetySetting],
     gcr_model :: T.Text,
-    gcr_tools :: Maybe [FunctionDeclarations]
+    gcr_tools :: Maybe [FunctionDeclarations],
+    gcr_generationConfig :: Maybe GenerateContentConfig,
+    -- Imagen
+    gcr_instances :: Maybe [ImagenInstance],
+    gcr_parameters :: Maybe ImagenParameters
   }
   deriving (Show, Eq)
 
@@ -103,8 +145,21 @@ data GenerateCandidate = GenerateCandidate
   }
   deriving (Show, Eq)
 
-data GenerateResponse = GenerateResponseb
-  { grCandidates :: V.Vector GenerateCandidate
+data GeneratePrediction = GeneratePrediction
+  { gp_bytesBase64Encoded :: T.Text,
+    gp_mimeType :: T.Text
+  }
+  deriving (Show, Eq)
+
+$(deriveJSON (jsonOpts'' 3) ''GeneratePrediction)
+
+data GenerateResponse = GenerateResponse
+  { gr_candidates :: Maybe (V.Vector GenerateCandidate),
+    gr_predictions :: Maybe (V.Vector GeneratePrediction),
+    gr_modelVersion :: Maybe T.Text,
+    gr_usageMetadata :: Maybe A.Value,
+    gr_responseId :: Maybe T.Text,
+    gr_promptFeedback :: Maybe A.Object
   }
   deriving (Show, Eq)
 
@@ -112,6 +167,10 @@ $(deriveJSON (jsonOpts 2) ''GenerateContent)
 $(deriveJSON (jsonOpts 2) ''SafetySetting)
 $(deriveJSON (jsonOpts 3) ''ChatTool)
 $(deriveJSON (jsonOpts 3) ''FunctionDeclarations)
+$(deriveJSON (jsonOpts'' 3) ''ThinkingConfig)
+$(deriveJSON (jsonOpts'' 4) ''GenerateContentConfig)
+$(deriveJSON (jsonOpts'' 3) ''ImagenInstance)
+$(deriveJSON (jsonOpts'' 3) ''ImagenParameters)
 $(deriveJSON (jsonOpts'' 4) ''GenerateContentRequest)
 $(deriveJSON (jsonOpts 2) ''GenerateCandidate)
-$(deriveJSON (jsonOpts 2) ''GenerateResponse)
+$(deriveJSON (jsonOpts'' 3) ''GenerateResponse)

@@ -59,12 +59,20 @@ generateContent ::
   GoogleClient ->
   GenerateContentRequest ->
   m (Either ClientError GenerateResponse)
-generateContent sc a =
-  liftIO . runRequest (scMaxRetries sc) 0 $
-    runClientM
-      ( generateContent' (gcr_model a <> ":generateContent") (Just $ scToken sc) a -- {gcrModel = Nothing}
-      )
-      (mkClientEnv (scManager sc) (scBaseUrl sc))
+generateContent sc a = do
+  if "imagen" `T.isInfixOf` gcr_model a
+    then do
+      liftIO . runRequest (scMaxRetries sc) 0 $
+        runClientM
+          ( generateContent' (gcr_model a <> ":predict") (Just $ scToken sc) a -- {gcrModel = Nothing}
+          )
+          (mkClientEnv (scManager sc) (scBaseUrl sc))
+    else
+      liftIO . runRequest (scMaxRetries sc) 0 $
+        runClientM
+          ( generateContent' (gcr_model a <> ":generateContent") (Just $ scToken sc) a -- {gcrModel = Nothing}
+          )
+          (mkClientEnv (scManager sc) (scBaseUrl sc))
 
 generateContent' ::
   T.Text ->

@@ -8,29 +8,8 @@ module Anthropic.Client
     makeAnthropicClient,
     makeAnthropicClient',
     ClientError (..),
-
-    -- * Helper types
-    TimeStamp (..),
-    Usage (..),
-
-    -- * Models
-    ModelId (..),
-
-    -- * Chat
-    ChatRole (..),
-    ChatMessage (..),
-    ChatMessageContent (..),
-    ChatToolResult (..),
-    ChatCompletionRequest (..),
-    ChatStopReason (..),
-    ChatContent (..),
-    ChatContentText (..),
-    ChatContentTool (..),
-    ChatResponse (..),
-    ChatTool (..),
-    -- ChatToolType (..),
-    defaultChatCompletionRequest,
     completeChat,
+    module Anthropic.Resources,
   )
 where
 

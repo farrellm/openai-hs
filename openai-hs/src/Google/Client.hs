@@ -4,21 +4,9 @@
 module Google.Client
   ( GoogleClient (..),
     makeGoogleClient,
-    GenerateContentRequest (..),
-    GenerateResponse (..),
-    GeneratePart (..),
-    GeneratePartFuncCall (..),
-    GeneratePartFuncResponse (..),
-    GenerateContent (..),
-    GenerateCandidate (..),
-    ChatTool (..),
-    FunctionDeclarations (..),
-    ChatRole (..),
-    ClientError (..),
-    SafetySetting (..),
-    HarmCategory (..),
-    HarmBlockThreahold (..),
     generateContent,
+    ClientError (..),
+    module Google.Resources,
   )
 where
 

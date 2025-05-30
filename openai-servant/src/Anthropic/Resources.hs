@@ -15,12 +15,15 @@ module Anthropic.Resources
     ChatContent (..),
     ChatContentText (..),
     ChatContentTool (..),
+    ChatContentThinking (..),
+    ChatContentRedactedThinking (..),
     ChatMessage (..),
     ChatMessageContent (..),
     ChatToolResult (..),
     ChatCompletionRequest (..),
     ChatResponse (..),
     ChatTool (..),
+    ChatThinking (..),
     -- ChatToolType (..),
     defaultChatCompletionRequest,
   )
@@ -87,6 +90,12 @@ data ChatRole
 
 $(deriveJSON (jsonOpts' 3) ''ChatRole)
 
+data ChatContentText = ChatContentText
+  { chcxType :: T.Text,
+    chcxText :: T.Text
+  }
+  deriving (Show, Eq)
+
 data ChatContentTool = ChatContentTool
   { chctType :: T.Text,
     chctId :: T.Text,
@@ -95,27 +104,43 @@ data ChatContentTool = ChatContentTool
   }
   deriving (Show, Eq)
 
-$(deriveJSON (jsonOpts 4) ''ChatContentTool)
-
-data ChatContentText = ChatContentText
-  { chcxType :: T.Text,
-    chcxText :: T.Text
+data ChatContentThinking = ChatContentThinking
+  { chcthType :: T.Text,
+    chcthThinking :: T.Text,
+    chcthSignature :: T.Text
   }
   deriving (Show, Eq)
+
+data ChatContentRedactedThinking = ChatContentRedactedThinking
+  { chcrtType :: T.Text,
+    chcrtData :: T.Text
+  }
+  deriving (Show, Eq)
+
+$(deriveJSON (jsonOpts 4) ''ChatContentText)
+$(deriveJSON (jsonOpts 4) ''ChatContentTool)
+$(deriveJSON (jsonOpts 5) ''ChatContentThinking)
+$(deriveJSON (jsonOpts 5) ''ChatContentRedactedThinking)
 
 data ChatContent
   = CCText ChatContentText
   | CCTool ChatContentTool
+  | CCThinking ChatContentThinking
+  | CCRedactedThinking ChatContentRedactedThinking
   deriving (Show, Eq)
 
-$(deriveJSON (jsonOpts 4) ''ChatContentText)
-
 instance A.FromJSON ChatContent where
-  parseJSON v = CCText <$> A.parseJSON v <|> CCTool <$> A.parseJSON v
+  parseJSON v =
+    CCText <$> A.parseJSON v
+      <|> CCTool <$> A.parseJSON v
+      <|> CCThinking <$> A.parseJSON v
+      <|> CCRedactedThinking <$> A.parseJSON v
 
 instance A.ToJSON ChatContent where
   toJSON (CCText x) = A.toJSON x
   toJSON (CCTool x) = A.toJSON x
+  toJSON (CCThinking x) = A.toJSON x
+  toJSON (CCRedactedThinking x) = A.toJSON x
 
 data ChatToolResult = ChatToolResult
   { chtrType :: T.Text,
@@ -170,7 +195,8 @@ instance A.ToJSON ChatMessage where
 data ChatTool = ChatTool
   { chtName :: T.Text,
     chtDescription :: T.Text,
-    chtInputSchema :: A.Value
+    chtInputSchema :: A.Value,
+    chtRequired :: Maybe [T.Text]
   }
   deriving (Show, Eq)
 
@@ -197,6 +223,12 @@ data ChatTool = ChatTool
 --     functionName <- o A..: "name"
 --     pure $ CTC_name functionName
 
+data ChatThinking = ChatThinking
+  { chthType :: T.Text,
+    chthBudgetTokens :: Int
+  }
+  deriving (Show, Eq)
+
 data ChatCompletionRequest = ChatCompletionRequest
   { chcrModel :: ModelId,
     chcrMessages :: [ChatMessage],
@@ -206,7 +238,8 @@ data ChatCompletionRequest = ChatCompletionRequest
     chcrTemperature :: Maybe Double,
     chcrTopK :: Maybe Int,
     chcrTopP :: Maybe Double,
-    chcrTools :: Maybe [ChatTool]
+    chcrTools :: Maybe [ChatTool],
+    chcrThinking :: Maybe ChatThinking
   }
   deriving (Show, Eq)
 
@@ -221,7 +254,8 @@ defaultChatCompletionRequest model messages =
       chcrTemperature = Nothing,
       chcrTopK = Nothing,
       chcrTopP = Nothing,
-      chcrTools = Nothing
+      chcrTools = Nothing,
+      chcrThinking = Nothing
     }
 
 data ChatStopReason
@@ -237,7 +271,8 @@ data ChatResponse = ChatResponse
     chrRole :: ChatRole,
     chrContent :: [ChatContent],
     chrModel :: T.Text,
-    chrStopReason :: ChatStopReason
+    chrStopReason :: ChatStopReason,
+    chrUsage :: A.Object
   }
   deriving (Show)
 
@@ -246,6 +281,7 @@ data ChatResponse = ChatResponse
 -- $(deriveJSON (jsonOpts 2) ''JSONSchema)
 
 $(deriveJSON (jsonOpts 3) ''ChatTool)
+$(deriveJSON (jsonOpts 4) ''ChatThinking)
 $(deriveJSON (jsonOpts 4) ''ChatCompletionRequest)
 $(deriveJSON (jsonOpts' 4) ''ChatStopReason)
 
